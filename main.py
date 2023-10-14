@@ -11,17 +11,18 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+
 def main():
     # Initialize the visualization object
     visualize = Visualization()
-    
+
     # Load and preprocess data
     df = load_data()
 
     # Show class distribution and class sample (optional)
     # visualize.show_class_distribution(df)
     # visualize.show_class_sample(df)
-    
+
     # Process data and create training and validation datasets
     train_ds, val_ds = process_data(df)
 
@@ -38,18 +39,20 @@ def main():
     visualize.show_loss_val(history)
     visualize.show_AUC_val(history)
 
+
 def load_data():
     # Get a list of image file paths
     images = glob("dataset_2/train/*/*.jpg")
     # Replace backslash with forward slash to avoid unexpected errors
     images = [path.replace("\\", "/") for path in images]
-    
+
     # Create a DataFrame with file paths, labels, and binary labels
     df = pd.DataFrame({"filepath": images})
     df["label"] = df["filepath"].str.split("/", expand=True)[2]
     df["label_bin"] = np.where(df["label"].values == "malignant", 1, 0)
-    
+
     return df
+
 
 def process_data(df):
     # Split data into features and targets
@@ -81,6 +84,7 @@ def process_data(df):
     )
 
     return train_ds, val_ds
+
 
 if __name__ == "__main__":
     main()
