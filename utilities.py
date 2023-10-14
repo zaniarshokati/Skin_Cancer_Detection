@@ -4,10 +4,18 @@ from PIL import Image
 import pandas as pd
 import tensorflow as tf
 from keras import layers
+from glob import glob
+import os
+
+from sklearn.model_selection import train_test_split
 from tensorflow.keras import Model
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.applications.efficientnet import EfficientNetB7
 from tensorflow.keras.applications.resnet50 import ResNet50
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
+
+AUTO = tf.data.experimental.AUTOTUNE
 
 
 # Visualization class for displaying data-related information
@@ -52,7 +60,35 @@ class Visualization:
 
 
 # ImageProcessing class for image decoding and preprocessing
-class ImageProcessing:
+class ProcessData:
+
+    def load_train_data(self,train_path):
+        # Get a list of image file paths
+        images = glob(train_path)
+        # Replace backslash with forward slash to avoid unexpected errors
+        images = [path.replace("\\", "/") for path in images]
+
+        # Create a DataFrame with file paths, labels, and binary labels
+        df = pd.DataFrame({"filepath": images})
+        df["label"] = df["filepath"].str.split("/", expand=True)[2]
+        df["label_bin"] = np.where(df["label"].values == "malignant", 1, 0)
+
+        return df
+    
+    def load_test_data(self,test_path):
+        # Get a list of image file paths
+        path_list = sorted(glob(test_path))
+        # Replace backslash with forward slash to avoid unexpected errors
+        # images = [path.replace("\\", "/") for path in images]
+        file_names = [os.path.basename(path) for path in path_list]
+        # Create a DataFrame with file paths, labels, and binary labels
+        df = pd.DataFrame({"filename": path_list})
+        directory_names = [os.path.dirname(path).split(os.path.sep)[-1] for path in path_list]
+        df["label"] = directory_names
+        df["label_bin"] = np.where(df["label"].values == "malignant", 1, 0)
+        df.to_csv("test_data.csv", index=False)
+        return df
+    
     def decode_image(self, filepath, label=None):
         # Decode and preprocess an image
         img = tf.io.read_file(filepath)
@@ -63,16 +99,55 @@ class ImageProcessing:
         if label is None:
             return img
         return img, label
+    
+    def process_data(self,df):
+        # Split data into features and targets
+        features = df["filepath"]
+        target = df["label_bin"]
+
+        # Split the data into training and validation sets
+        X_train, X_val, Y_train, Y_val = train_test_split(
+            features, target, test_size=0.15, random_state=10
+        )
+
+        # Create training dataset
+        train_ds = (
+            tf.data.Dataset.from_tensor_slices((X_train, Y_train))
+            .map(self.decode_image, num_parallel_calls=AUTO)
+            .batch(32)
+            .prefetch(AUTO)
+        )
+
+        # Create validation dataset
+        val_ds = (
+            tf.data.Dataset.from_tensor_slices((X_val, Y_val))
+            .map(self.decode_image, num_parallel_calls=AUTO)
+            .batch(32)
+            .prefetch(AUTO)
+        )
+
+        return train_ds, val_ds
+    
+    def process_test_data(self, df):
+        features = df["filename"]  # Assuming "filename" is the column containing the file paths
+        test_ds = (
+            tf.data.Dataset.from_tensor_slices(features)
+            .map(self.decode_image, num_parallel_calls=AUTO)
+            .batch(32)
+            .prefetch(AUTO)
+        )
+        print(test_ds)
+        return test_ds
 
 
 # CreateModel class for creating a neural network model
-class CreateModel:
+class HandleModel:
     def create_model(self):
         # Create a neural network model based on ResNet50
         base_model = ResNet50(
             weights="imagenet", include_top=False, input_shape=(224, 224, 3)
         )
-        for layer in base_model.layers[5:]:
+        for layer in base_model.layers[50:]:
             layer.trainable = False
 
         inputs = layers.Input(shape=(224, 224, 3))
@@ -82,5 +157,26 @@ class CreateModel:
         x = layers.Dropout(0.5)(x)
         outputs = layers.Dense(1, activation="sigmoid")(x)
         model = Model(inputs, outputs)
-
+        
         return model
+    
+    def compile_model(self, model):
+        # initial_learning_rate = 0.001
+        # lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        #     initial_learning_rate, decay_steps=10000, decay_rate=0.9
+        # )
+        # optimizer = Adam(learning_rate=lr_schedule)
+        model.compile(optimizer="adam", loss='binary_crossentropy', metrics=['AUC'])
+        return model    
+    
+    def train_model(self, model, train_ds, val_ds):
+        early = EarlyStopping(monitor='val_loss', patience=10, min_delta=0.001, restore_best_weights=True)
+        history = model.fit(
+            train_ds,
+            validation_data=val_ds,
+            epochs=5,
+            callbacks=[early]
+        )
+        model.save("Model.h5")
+        return history
+
