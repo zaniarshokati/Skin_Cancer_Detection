@@ -27,8 +27,7 @@ def main():
     train_ds, val_ds = process_data(df)
 
     # Create and compile the model
-    model_creator = CreateModel()
-    model = model_creator.create_model()
+    model = CreateModel.create_model()
     model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["AUC"])
     print(model.summary())
 
