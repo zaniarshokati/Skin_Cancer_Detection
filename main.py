@@ -23,11 +23,6 @@ class Application:
 		df_train = self.data_processor.load_train_data(train_path)
 		df_test = self.data_processor.load_test_data(test_path)
 		
-		# Apply data augmentation to the training dataset
-		# augmented_train_ds, val_ds = self.data_processor.process_data_with_augmentation(df_train)
-
-		
-	
 		# Show class distribution and class sample (optional)
 		# visualize.show_class_distribution(df)
 		# visualize.show_class_sample(df)
@@ -35,6 +30,9 @@ class Application:
 		# Process data and create training and validation datasets
 		train_ds, val_ds = self.data_processor.process_data(df_train)
 		test_ds = self.data_processor.process_test_data(df_test)
+
+		# Apply data augmentation to the training dataset
+		# augmented_train_ds, val_ds = self.data_processor.process_data_with_augmentation(train_ds, val_ds)
 
 		# CNN
 		input_shape = (224, 224, 3) 
