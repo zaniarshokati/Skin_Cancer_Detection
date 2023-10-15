@@ -22,35 +22,36 @@ class Application:
 		test_path = "dataset_2/test/*/*.jpg"
 		df_train = self.data_processor.load_train_data(train_path)
 		df_test = self.data_processor.load_test_data(test_path)
+		
+		# Apply data augmentation to the training dataset
+		augmented_train_ds, val_ds = self.data_processor.process_data_with_augmentation(df_train)
+
 		# Process the test data
 		test_ds = self.data_processor.process_test_data(df_test)
+	
 		# Show class distribution and class sample (optional)
 		# visualize.show_class_distribution(df)
 		# visualize.show_class_sample(df)
 		
 		# Process data and create training and validation datasets
-		train_ds, val_ds = self.data_processor.process_data(df_train)
+		train_ds, val_ds = self.data_processor.process_data(augmented_train_ds)
 
-
-
-		# Create and compile the model
 		# CNN
 		input_shape = (224, 224, 3) 
 		model = self.model_handler.create_model_cnn(input_shape)
 		model = self.model_handler.compile_model(model)
+		
 		# Transfer Learning 
 		# model = self.model_handler.create_model_transfer_learning()
 		# model = self.model_handler.compile_model(model)
 										   
-		# RenNet Model
-		# input_shape = (224, 224, 3) 
-		# num_classes = 2  # Change this according to the number of classes in your dataset
+		# ResNet Model
 		# model = self.model_handler.residual_model(input_shape)
 		# model = self.model_handler.compile_model(model)
+
 		print(model.summary())
 
 		# Train the model and save the training history
-		# history = model.fit(train_ds, validation_data=val_ds, epochs=5, verbose=1)
 		history = self.model_handler.train_model(model, train_ds, val_ds)
 		# Display loss and AUC graphs
 		self.visualize.show_loss_val(history)
@@ -67,6 +68,7 @@ class Application:
 		y_true = df_test["label_bin"]
 		y_pred = (predictions > 0.5).astype(int)  # Convert probabilities to binary predictions
 		report = classification_report(y_true, y_pred)
+		self.visualize.show_confusion_matrix(y_true,y_pred)
 		print(report)
 
 if __name__ == "__main__":

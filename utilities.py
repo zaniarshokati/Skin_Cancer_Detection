@@ -6,6 +6,8 @@ import tensorflow as tf
 from keras import layers
 from glob import glob
 import os
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
 
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import Model
@@ -15,6 +17,9 @@ from tensorflow.keras.applications.resnet50 import ResNet50
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.models import Sequential
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
 
 AUTO = tf.data.experimental.AUTOTUNE
 
@@ -57,6 +62,16 @@ class Visualization:
         hist_df[["loss", "val_loss"]].plot()
         plt.title("Loss v/s Validation Loss")
         plt.legend()
+        plt.show()
+
+    def show_confusion_matrix(self,true_labels, predicted_labels):
+        cm = confusion_matrix(true_labels, predicted_labels)
+        # Create a heatmap of the confusion matrix
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False)
+        plt.xlabel("Predicted")
+        plt.ylabel("Actual")
+        plt.title("Confusion Matrix")
         plt.show()
 
 
@@ -142,6 +157,47 @@ class ProcessData:
         print(test_ds)
         return test_ds
 
+    def data_augmentation(self):
+        data_gen = ImageDataGenerator(
+            horizontal_flip=True,
+            vertical_flip=True,
+            rotation_range=10,
+            width_shift_range=0.2,
+            height_shift_range=0.2,
+            shear_range=0.1,
+            zoom_range=0.2,
+            brightness_range=(0.8, 1.2)
+        )
+
+        return data_gen
+    
+    def process_data_with_augmentation(self, df):
+
+        features = df["filepath"]
+        target = df["label_bin"].values
+
+        X_train, X_val, Y_train, Y_val = train_test_split(
+            features, target, test_size=0.15, random_state=10
+        )
+
+        train_ds = (
+            tf.data.Dataset.from_tensor_slices((X_train, Y_train))
+            .map(self.decode_image, num_parallel_calls=AUTO)
+            .batch(32)
+            .prefetch(AUTO)
+        )
+
+        val_ds = (
+            tf.data.Dataset.from_tensor_slices((X_val, Y_val))
+            .map(self.decode_image, num_parallel_calls=AUTO)
+            .batch(32)
+            .prefetch(AUTO)
+        )
+
+        data_gen = self.data_augmentation()
+        augmented_train_ds = data_gen.flow(train_ds, batch_size=32)
+
+        return augmented_train_ds, val_ds
 
 # CreateModel class for creating a neural network model
 class HandleModel:
@@ -173,7 +229,6 @@ class HandleModel:
         
         x = layers.GlobalAveragePooling2D()(x)
         outputs = layers.Dense(1, activation='sigmoid')(x) 
-        
         model = Model(inputs=inputs, outputs=outputs)
         
         return model
@@ -217,7 +272,7 @@ class HandleModel:
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate, decay_steps=10000, decay_rate=0.9
         )
-        optimizer = Adam(learning_rate=lr_schedule)
+        optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=lr_schedule)
         model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['AUC'])
         return model    
     
@@ -226,7 +281,7 @@ class HandleModel:
         history = model.fit(
             train_ds,
             validation_data=val_ds,
-            epochs=50,
+            epochs=5,
             callbacks=[early]
         )
         model.save("Model.h5")
