@@ -81,9 +81,6 @@ class ProcessData:
     def load_train_data(self,train_path):
         # Get a list of image file paths
         images = glob(train_path)
-        # Replace backslash with forward slash to avoid unexpected errors
-        # images = [path.replace("\\", "/") for path in images]
-
         # Create a DataFrame with file paths, labels, and binary labels
         df = pd.DataFrame({"filepath": images})
         df["label"] = df["filepath"].str.split("/", expand=True)[2]
@@ -95,9 +92,6 @@ class ProcessData:
     def load_test_data(self,test_path):
         # Get a list of image file paths
         path_list = sorted(glob(test_path))
-        # Replace backslash with forward slash to avoid unexpected errors
-        # images = [path.replace("\\", "/") for path in images]
-        file_names = [os.path.basename(path) for path in path_list]
         # Create a DataFrame with file paths, labels, and binary labels
         df = pd.DataFrame({"filename": path_list})
         directory_names = [os.path.dirname(path).split(os.path.sep)[-1] for path in path_list]
