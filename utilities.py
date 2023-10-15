@@ -138,7 +138,6 @@ class ProcessData:
         )
 
         return train_ds, val_ds
-
     
     def process_test_data(self, df):
         features = df["filename"]  # Assuming "filename" is the column containing the file paths
@@ -148,11 +147,10 @@ class ProcessData:
             .batch(32)
             .prefetch(AUTO)
         )
-        print(test_ds)
         return test_ds
 
     def data_augmentation(self):
-        data_gen = ImageDataGenerator(
+        gen = ImageDataGenerator(
             horizontal_flip=True,
             vertical_flip=True,
             rotation_range=10,
@@ -163,33 +161,16 @@ class ProcessData:
             brightness_range=(0.8, 1.2)
         )
 
-        return data_gen
+        return gen
     
-    def process_data_with_augmentation(self, df):
-
-        features = df["filepath"]
-        target = df["label_bin"].values
-
-        X_train, X_val, Y_train, Y_val = train_test_split(
-            features, target, test_size=0.15, random_state=10
-        )
-
-        train_ds = (
-            tf.data.Dataset.from_tensor_slices((X_train, Y_train))
-            .map(self.decode_image, num_parallel_calls=AUTO)
-            .batch(32)
-            .prefetch(AUTO)
-        )
-
-        val_ds = (
-            tf.data.Dataset.from_tensor_slices((X_val, Y_val))
-            .map(self.decode_image, num_parallel_calls=AUTO)
-            .batch(32)
-            .prefetch(AUTO)
-        )
+    def process_data_with_augmentation(self, train_ds,val_ds):
 
         data_gen = self.data_augmentation()
-        augmented_train_ds = data_gen.flow(train_ds, batch_size=32)
+        #     # Convert TensorFlow Datasets to NumPy arrays
+        train_ds_numpy = list(train_ds.as_numpy_iterator())
+        val_ds_numpy = list(val_ds.as_numpy_iterator())
+    
+        augmented_train_ds = data_gen.flow(train_ds_numpy, batch_size=32)
 
         return augmented_train_ds, val_ds
 
