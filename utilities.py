@@ -281,7 +281,7 @@ class HandleModel:
         history = model.fit(
             train_ds,
             validation_data=val_ds,
-            epochs=5,
+            epochs=50,
             callbacks=[early]
         )
         model.save("Model.h5")

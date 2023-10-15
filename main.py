@@ -24,17 +24,17 @@ class Application:
 		df_test = self.data_processor.load_test_data(test_path)
 		
 		# Apply data augmentation to the training dataset
-		augmented_train_ds, val_ds = self.data_processor.process_data_with_augmentation(df_train)
+		# augmented_train_ds, val_ds = self.data_processor.process_data_with_augmentation(df_train)
 
-		# Process the test data
-		test_ds = self.data_processor.process_test_data(df_test)
+		
 	
 		# Show class distribution and class sample (optional)
 		# visualize.show_class_distribution(df)
 		# visualize.show_class_sample(df)
 		
 		# Process data and create training and validation datasets
-		train_ds, val_ds = self.data_processor.process_data(augmented_train_ds)
+		train_ds, val_ds = self.data_processor.process_data(df_train)
+		test_ds = self.data_processor.process_test_data(df_test)
 
 		# CNN
 		input_shape = (224, 224, 3) 
