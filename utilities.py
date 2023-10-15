@@ -14,6 +14,7 @@ from tensorflow.keras.applications.efficientnet import EfficientNetB7
 from tensorflow.keras.applications.resnet50 import ResNet50
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.models import Sequential
 
 AUTO = tf.data.experimental.AUTOTUNE
 
@@ -66,12 +67,13 @@ class ProcessData:
         # Get a list of image file paths
         images = glob(train_path)
         # Replace backslash with forward slash to avoid unexpected errors
-        images = [path.replace("\\", "/") for path in images]
+        # images = [path.replace("\\", "/") for path in images]
 
         # Create a DataFrame with file paths, labels, and binary labels
         df = pd.DataFrame({"filepath": images})
         df["label"] = df["filepath"].str.split("/", expand=True)[2]
         df["label_bin"] = np.where(df["label"].values == "malignant", 1, 0)
+        df["label_bin"] = df["label_bin"].astype(int)
 
         return df
     
@@ -100,10 +102,10 @@ class ProcessData:
             return img
         return img, label
     
-    def process_data(self,df):
+    def process_data(self, df):
         # Split data into features and targets
         features = df["filepath"]
-        target = df["label_bin"]
+        target = df["label_bin"].values  # Convert labels to a NumPy array
 
         # Split the data into training and validation sets
         X_train, X_val, Y_train, Y_val = train_test_split(
@@ -127,6 +129,7 @@ class ProcessData:
         )
 
         return train_ds, val_ds
+
     
     def process_test_data(self, df):
         features = df["filename"]  # Assuming "filename" is the column containing the file paths
@@ -142,12 +145,61 @@ class ProcessData:
 
 # CreateModel class for creating a neural network model
 class HandleModel:
-    def create_model(self):
+    def residual_block(self, input_tensor, num_filters, stride=1):
+
+        x = layers.Conv2D(num_filters, kernel_size=(3, 3), strides=stride, padding='same')(input_tensor)
+        x = layers.BatchNormalization()(x)
+        x = layers.ReLU()(x)
+        x = layers.Conv2D(num_filters, kernel_size=(3, 3), padding='same')(x)
+        x = layers.BatchNormalization()(x)
+        
+        if stride != 1 or input_tensor.shape[-1] != num_filters:
+            input_tensor = layers.Conv2D(num_filters, kernel_size=(1, 1), strides=stride, padding='same')(input_tensor)
+        
+        x = layers.Add()([input_tensor, x])
+        x = layers.ReLU()(x)
+    
+        return x
+    
+    def residual_model(self,input_shape, num_blocks=3, num_filters=32):
+        inputs = layers.Input(shape=input_shape)
+        
+        x = layers.Conv2D(num_filters, (7, 7), strides=2, padding='same')(inputs)
+        x = layers.BatchNormalization()(x)
+        x = layers.ReLU()(x)
+        
+        for _ in range(num_blocks):
+            x = self.residual_block(x, num_filters)
+        
+        x = layers.GlobalAveragePooling2D()(x)
+        outputs = layers.Dense(1, activation='sigmoid')(x) 
+        
+        model = Model(inputs=inputs, outputs=outputs)
+        
+        return model
+
+    def create_model_cnn(self,input_shape):
+
+        model = Sequential()
+        model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape))
+        model.add(layers.MaxPooling2D((2, 2)))
+        model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+        model.add(layers.MaxPooling2D((2, 2)))
+        model.add(layers.Conv2D(128, (3, 3), activation='relu'))
+        model.add(layers.MaxPooling2D((2, 2)))
+        model.add(layers.Flatten())
+        model.add(layers.Dense(128, activation='relu'))
+        model.add(layers.Dropout(0.5))
+        model.add(layers.Dense(1, activation='sigmoid'))
+
+        return model
+    
+    def create_model_transfer_learning(self):
         # Create a neural network model based on ResNet50
         base_model = ResNet50(
             weights="imagenet", include_top=False, input_shape=(224, 224, 3)
         )
-        for layer in base_model.layers[50:]:
+        for layer in base_model.layers[:45]:
             layer.trainable = False
 
         inputs = layers.Input(shape=(224, 224, 3))
@@ -161,12 +213,12 @@ class HandleModel:
         return model
     
     def compile_model(self, model):
-        # initial_learning_rate = 0.001
-        # lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-        #     initial_learning_rate, decay_steps=10000, decay_rate=0.9
-        # )
-        # optimizer = Adam(learning_rate=lr_schedule)
-        model.compile(optimizer="adam", loss='binary_crossentropy', metrics=['AUC'])
+        initial_learning_rate = 0.001
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate, decay_steps=10000, decay_rate=0.9
+        )
+        optimizer = Adam(learning_rate=lr_schedule)
+        model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['AUC'])
         return model    
     
     def train_model(self, model, train_ds, val_ds):
@@ -174,7 +226,7 @@ class HandleModel:
         history = model.fit(
             train_ds,
             validation_data=val_ds,
-            epochs=5,
+            epochs=50,
             callbacks=[early]
         )
         model.save("Model.h5")
