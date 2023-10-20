@@ -64,7 +64,7 @@ class Visualization:
         plt.legend()
         plt.show()
 
-    def show_confusion_matrix(self,true_labels, predicted_labels):
+    def show_confusion_matrix(self, true_labels, predicted_labels):
         cm = confusion_matrix(true_labels, predicted_labels)
         # Create a heatmap of the confusion matrix
         plt.figure(figsize=(8, 6))
@@ -77,8 +77,7 @@ class Visualization:
 
 # ImageProcessing class for image decoding and preprocessing
 class ProcessData:
-
-    def load_train_data(self,train_path):
+    def load_train_data(self, train_path):
         # Get a list of image file paths
         images = glob(train_path)
         # Create a DataFrame with file paths, labels, and binary labels
@@ -88,18 +87,20 @@ class ProcessData:
         df["label_bin"] = df["label_bin"].astype(int)
 
         return df
-    
-    def load_test_data(self,test_path):
+
+    def load_test_data(self, test_path):
         # Get a list of image file paths
         path_list = sorted(glob(test_path))
         # Create a DataFrame with file paths, labels, and binary labels
         df = pd.DataFrame({"filename": path_list})
-        directory_names = [os.path.dirname(path).split(os.path.sep)[-1] for path in path_list]
+        directory_names = [
+            os.path.dirname(path).split(os.path.sep)[-1] for path in path_list
+        ]
         df["label"] = directory_names
         df["label_bin"] = np.where(df["label"].values == "malignant", 1, 0)
         df.to_csv("test_data.csv", index=False)
         return df
-    
+
     def decode_image(self, filepath, label=None):
         # Decode and preprocess an image
         img = tf.io.read_file(filepath)
@@ -110,7 +111,7 @@ class ProcessData:
         if label is None:
             return img
         return img, label
-    
+
     def process_data(self, df):
         # Split data into features and targets
         features = df["filepath"]
@@ -138,9 +139,11 @@ class ProcessData:
         )
 
         return train_ds, val_ds
-    
+
     def process_test_data(self, df):
-        features = df["filename"]  # Assuming "filename" is the column containing the file paths
+        features = df[
+            "filename"
+        ]  # Assuming "filename" is the column containing the file paths
         test_ds = (
             tf.data.Dataset.from_tensor_slices(features)
             .map(self.decode_image, num_parallel_calls=AUTO)
@@ -158,72 +161,74 @@ class ProcessData:
             height_shift_range=0.2,
             shear_range=0.1,
             zoom_range=0.2,
-            brightness_range=(0.8, 1.2)
+            brightness_range=(0.8, 1.2),
         )
 
         return gen
-    
-    def process_data_with_augmentation(self, train_ds,val_ds):
 
+    def process_data_with_augmentation(self, train_ds, val_ds):
         data_gen = self.data_augmentation()
         #     # Convert TensorFlow Datasets to NumPy arrays
         train_ds_numpy = list(train_ds.as_numpy_iterator())
         val_ds_numpy = list(val_ds.as_numpy_iterator())
-    
+
         augmented_train_ds = data_gen.flow(train_ds_numpy, batch_size=32)
 
         return augmented_train_ds, val_ds
 
+
 # CreateModel class for creating a neural network model
 class HandleModel:
     def residual_block(self, input_tensor, num_filters, stride=1):
-
-        x = layers.Conv2D(num_filters, kernel_size=(3, 3), strides=stride, padding='same')(input_tensor)
+        x = layers.Conv2D(
+            num_filters, kernel_size=(3, 3), strides=stride, padding="same"
+        )(input_tensor)
         x = layers.BatchNormalization()(x)
         x = layers.ReLU()(x)
-        x = layers.Conv2D(num_filters, kernel_size=(3, 3), padding='same')(x)
+        x = layers.Conv2D(num_filters, kernel_size=(3, 3), padding="same")(x)
         x = layers.BatchNormalization()(x)
-        
+
         if stride != 1 or input_tensor.shape[-1] != num_filters:
-            input_tensor = layers.Conv2D(num_filters, kernel_size=(1, 1), strides=stride, padding='same')(input_tensor)
-        
+            input_tensor = layers.Conv2D(
+                num_filters, kernel_size=(1, 1), strides=stride, padding="same"
+            )(input_tensor)
+
         x = layers.Add()([input_tensor, x])
         x = layers.ReLU()(x)
-    
+
         return x
-    
-    def residual_model(self,input_shape, num_blocks=3, num_filters=32):
+
+    def residual_model(self, input_shape, num_blocks=3, num_filters=32):
         inputs = layers.Input(shape=input_shape)
-        
-        x = layers.Conv2D(num_filters, (7, 7), strides=2, padding='same')(inputs)
+
+        x = layers.Conv2D(num_filters, (7, 7), strides=2, padding="same")(inputs)
         x = layers.BatchNormalization()(x)
         x = layers.ReLU()(x)
-        
+
         for _ in range(num_blocks):
             x = self.residual_block(x, num_filters)
-        
+
         x = layers.GlobalAveragePooling2D()(x)
-        outputs = layers.Dense(1, activation='sigmoid')(x) 
+        outputs = layers.Dense(1, activation="sigmoid")(x)
         model = Model(inputs=inputs, outputs=outputs)
-        
+
         return model
 
-    def create_model_cnn(self,input_shape):
-
+    def create_model_cnn(self, input_shape):
         model = Sequential()
-        model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape))
+        model.add(layers.Conv2D(32, (3, 3), activation="relu", input_shape=input_shape))
         model.add(layers.MaxPooling2D((2, 2)))
-        model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+        model.add(layers.Conv2D(64, (3, 3), activation="relu"))
         model.add(layers.MaxPooling2D((2, 2)))
-        model.add(layers.Conv2D(128, (3, 3), activation='relu'))
+        model.add(layers.Conv2D(128, (3, 3), activation="relu"))
         model.add(layers.MaxPooling2D((2, 2)))
         model.add(layers.Flatten())
-        model.add(layers.Dense(128, activation='relu'))
+        model.add(layers.Dense(128, activation="relu"))
         model.add(layers.Dropout(0.5))
-        model.add(layers.Dense(1, activation='sigmoid'))
+        model.add(layers.Dense(1, activation="sigmoid"))
 
         return model
-    
+
     def create_model_transfer_learning(self):
         # Create a neural network model based on ResNet50
         base_model = ResNet50(
@@ -239,26 +244,24 @@ class HandleModel:
         x = layers.Dropout(0.5)(x)
         outputs = layers.Dense(1, activation="sigmoid")(x)
         model = Model(inputs, outputs)
-        
+
         return model
-    
+
     def compile_model(self, model):
         initial_learning_rate = 0.001
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate, decay_steps=10000, decay_rate=0.9
         )
         optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=lr_schedule)
-        model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['AUC'])
-        return model    
-    
+        model.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=["AUC"])
+        return model
+
     def train_model(self, model, train_ds, val_ds):
-        early = EarlyStopping(monitor='val_loss', patience=10, min_delta=0.001, restore_best_weights=True)
+        early = EarlyStopping(
+            monitor="val_loss", patience=10, min_delta=0.001, restore_best_weights=True
+        )
         history = model.fit(
-            train_ds,
-            validation_data=val_ds,
-            epochs=50,
-            callbacks=[early]
+            train_ds, validation_data=val_ds, epochs=50, callbacks=[early]
         )
         model.save("Model.h5")
         return history
-
