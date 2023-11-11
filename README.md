@@ -4,7 +4,7 @@
 
 This project is a comprehensive guide to building and training a deep learning model for image classification using TensorFlow and Keras. The code provided in this repository includes a Python script (`main.py`) and a utility module (`utilities.py`) to perform the following tasks:
 
-1. **Data Loading and Preprocessing**: The project starts by loading and preprocessing image data for a binary classification task. The dataset is assumed to be structured with images in different subdirectories.
+1. **Data Loading and Preprocessing**: The project starts by loading and preprocessing image data for a binary classification task. The dataset is assumed to be structured with images in different subdirectories.You can download the image dataset from [here](https://drive.google.com/drive/folders/1BAC4wJNksepPk3fquLF-DiWdS4nnIE1G?usp=share_link).
 
 2. **Data Visualization**: The `Visualization` class in `utilities.py` offers various functions to visualize the data, such as displaying class distribution, sample images for each class, and plotting AUC and loss graphs.
 
